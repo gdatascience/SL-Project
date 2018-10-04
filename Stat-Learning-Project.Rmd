@@ -1,0 +1,564 @@
+---
+title: 'Statistical Learning: Final Project'
+author: 
+- 'Mike Baietto'
+- 'West'
+- 'mbaietto@nd.edu'
+date: "9/29/2018"
+output: pdf_document
+---
+
+#Final Project
+##Description
+The goal of this project is to identify and explore interesting aspects of data in a
+real-world context, provide extensive explanations about each step, and report on your
+analysis of the results. The final project will involve communicating results of your
+analysis and technical results in a group presentation that effectively translates your
+work. You will work in groups of 3-4 students for the group presentation component and
+turn in an individual write-up component.
+
+The project will consist of the following tasks:
+??? Analyzing data and selecting the model best suited to solve the problem.
+??? Implementing and optimizing algorithms discussed in this course.
+??? Using R or Python to perform computations and analyze the results.
+??? Completing a slide deck in Google Slides for the group presentation.
+??? Effectively communicating methodology and results during the group presentation.
+
+\pagebreak
+
+#Read In spambase.data file
+
+```{r message=FALSE}
+#Start Fresh
+rm(list=ls())
+```
+
+```{r message=FALSE}
+#Load libraries
+library(tidyverse)
+library(plm)
+library(tidyr)
+library(ggplot2)
+library(scales)
+library(readstata13)
+library(corrplot)
+library(reshape)
+library(dplyr)
+library(corrplot)
+library(gridExtra)
+library(rpart)
+library(partykit)
+library(caret)
+library(mlbench)
+library(tidyverse)
+library(rminer)
+library(randomForest)
+library(reshape2)
+library(MASS)
+library(e1071)
+#install.packages("wsrf")
+library(wsrf)
+library(kernlab)
+```
+
+```{r}
+#Set Working Directory to Read File
+#Directory <- ("C:/Users/mb4879/Documents/University of Notre Dame/Courses/2018_3 Fall/")
+#Course <- ("DS64640 Statistical Learning for Data Science 2credit/")
+#Week <- ("week11_Final_Project")
+#DCW <- paste0(Directory,Course,Week)
+#DCW
+#setwd(DCW)
+#Load File
+# set working directory and import data
+setwd("C:/Users/danma/Documents/Statistical Learning/Final Project")
+spamdata <- read.csv("spambase.data",header=FALSE)
+dim(spamdata)
+```
+
+```{r}
+glimpse(spamdata)
+```
+
+
+```{r}
+#Find NA per Column
+
+if (sum(is.na(spamdata)) == 0){
+  print(paste("The count of NA in dataset =", sum(is.na(spamdata))))
+}else{
+cnt <- ncol(spamdata)
+for (i in 1:cnt){
+  print(colnames(spamdata)[i])
+  print(sum(is.na(spamdata[,i])))
+  }
+}
+```
+
+```{r}
+
+newnames <- c("freq_make", "freq_address", "freq_all", "freq_3d", "freq_our", "freq_over", "freq_remove", "freq_internet", 
+              "freq_order", "freq_mail", "freq_receive", "freq_will", "freq_people", "freq_report", "freq_addresses", "freq_free",
+              "freq_business", "freq_email", "freq_you", "freq_credit", "freq_your", "freq_font", "freq_000", "freq_money", 
+              "freq_hp", "freq_hpl", "freq_george", "freq_650", "freq_lab", "freq_labs", "freq_telnet", "freq_857",
+              "freq_data", "freq_415", "freq_85", "freq_technology", "freq_1999", "freq_parts", "freq_pm", "freq_direct",
+              "freq_vcs", "freq_meeting", "freq_original", "freq_project", "freq_re", "freq_edu", "freq_table", "freq_conference",
+              "freq_semicolon", "freq_parentheses", "freq_bracket", "freq_exclamation_point", "freq_dollar_sign", "freq_pound_sign", 
+              "caps_len_average", "caps_len_longest", "caps_len_total", "spam")
+
+names(spamdata) <- newnames
+
+spamdata$caps_len_longest <- as.double(spamdata$caps_len_longest)
+spamdata$caps_len_total <- as.double(spamdata$caps_len_total)
+spamdata <- spamdata %>% dplyr::select(spam,everything())
+spamdata$spam <- as.factor(ifelse(spamdata$spam==1,"Y","N"))
+```
+
+```{r}
+glimpse(spamdata)
+```
+
+```{r}
+names(spamdata)
+```
+
+```{r}
+table(spamdata$spam)
+```
+
+```{r}
+#manually look for outliers 
+# standard deviation methods 
+# 2 SD beyond the mean covers 95% of a normally distributed variable 
+# 3 SD +/- the mean covers 99.7% of a normally distributed variable
+
+for (i in 2:ncol(spamdata)){
+  temp <- spamdata[,i] > (mean(spamdata[,i] + 3*sd(spamdata[,i])))
+  temp2 <- round(table(temp)[2]/nrow(spamdata) * 100,2)
+  temp2
+  print(paste(temp2, "pecent of the", names(spamdata)[i], "data exceeds 3 SD from the mean")) 
+}
+
+#sapply(dat_num, function(d) (d > (mean(d) + 2*sd(d))))
+#sapply(dat_num, function(d) which(d > (mean(d) + 2*sd(d))))
+```
+
+
+```{r}
+#Rescale the numeric data
+
+spamdata2 <- spamdata
+rescale_x <- function(x){(x-min(x))/(max(x)-min(x))}
+
+for (i in 2:ncol(spamdata)){
+spamdata2[[i]] <- rescale_x(spamdata[[i]])
+}
+```
+
+```{r}
+summary(spamdata2)
+```
+
+
+#Create histograms for the predictor variables
+```{r}
+# Create Histograms
+for (i in 2:ncol(spamdata)){
+  assign(paste0("h", i), ggplot(data= spamdata, aes_string(colnames(spamdata)[i], fill=spamdata$spam)) + geom_histogram() + #ggtitle(names(spamdata2[i])) +
+  theme_bw()+ theme(plot.title = element_text(hjust = 0.5)))
+}
+```
+
+```{r fig.height=90, fig.width=10, message=FALSE}
+grid.arrange(h2, h3, h4, h5, h6, h7, h8, h9, h10, h11,
+             h12, h13, h14, h15, h16, h17, h18, h19, h20, h21,
+             h22, h23, h24, h25, h26, h27, h28, h29, h30, h31,
+             h32, h33, h34, h35, h36, h37, h38, h39, h40, h41,
+             h42, h43, h44, h45, h46, h47, h48, h49, h50, h51,
+             h52, h53, h54, h55, h56, h57, h58,
+             ncol=2,
+             top=textGrob(expression(bold(underline("Histograms"))),
+                          gp=gpar(fontsize=20,font=3)))
+```
+
+#Create box plots for the predictor variables
+```{r}
+# Create Boxplots
+for (i in 2:ncol(spamdata)){
+  assign(paste0("p", i), 
+         ggplot( data = spamdata,
+                 aes_string(x = names(spamdata[1]),
+                     y = names(spamdata[i]),
+                               fill = spamdata$spam)) +
+                 geom_boxplot() + coord_flip() +
+                   theme_bw()+
+                   theme(plot.title = element_text(hjust = 1.5)))
+}
+```
+
+
+```{r fig.height=90, fig.width=10, message=FALSE}
+grid.arrange(p2, p3, p4, p5, p6, p7, p8, p9, p10, p11,
+             p12, p13, p14, p15, p16, p17, p18, p19, p20, p21,
+             p22, p23, p24, p25, p26, p27, p28, p29, p30, p31,
+             p32, p33, p34, p35, p36, p37, p38, p39, p40, p41,
+             p42, p43, p44, p45, p46, p47, p48, p49, p50, p51,
+             p52, p53, p54, p55, p56, p57, p58,
+             ncol=2,
+             top=textGrob(expression(bold(underline("Boxplots"))),
+                          gp=gpar(fontsize=20,font=3)))
+```
+
+
+##################################################################
+#
+#
+# MODELING SECTION
+#
+#
+##################################################################
+
+Define our constants
+```{r}
+# random seed
+SEED <- 0
+
+# training replications
+REPS <- 50
+
+# train-test split ratio
+RATIO <- 0.6
+
+# number of trees
+NTREE <- 100
+```
+
+Define function for the common training tasks.
+
+```{r}
+###########################################################
+# Generic wrapper function for training and prediction
+#
+# @param name
+#     name of the model e.g. "Decision Tree"
+# @param build_model
+#     function to perform the model-specific training
+#     e.g. build_model <- function(data) {
+#              return(rpart(Y ~ ., data = data))
+#          }
+#
+# @param split_ratio
+#     train to test split ratio e.g. 0.75
+#
+# @param predict_call
+#     variable to control how predict is called
+#
+# @returns
+#     list containing the error % for each rep and the
+#     model for each rep
+#
+###########################################################
+
+train_wrapper <- function(name,
+                          build_model,
+                          split_ratio = 0.6,
+                          predict_call = 1) {
+  # set random seed to use same data splits
+  set.seed(SEED)
+  
+  # vector to store error for each repetition
+  errors <- rep(0, REPS)
+  
+  # vector to store models for each repetition
+  models <- vector(mode = "list", length = REPS)
+  
+  # vector to store yhat predictions for each repetition
+  yhats <- vector(mode = "list", length = REPS)
+  
+  # vector to store test sets
+  tests <- vector(mode = "list", length = REPS)
+
+  for (r in 1:length(errors)) {
+    # split data for train and test
+    id = holdout(spamdata$spam, ratio=split_ratio, mode='stratified')
+    train <- spamdata[id$tr,]
+    test <- spamdata[id$ts,]
+    tests[[r]] <- test
+    
+    # build model on training set
+    model <- build_model(train)
+    
+    # store model
+    models[[r]] <- model
+    
+    # predict on test set
+    yhat <- switch (predict_call,
+                    predict(model, test %>% dplyr::select(-spam), type = 'class'),
+                    predict(model, test %>% dplyr::select(-spam)),
+                    predict(model, test %>% dplyr::select(-spam))$class)
+    
+    # store predictions
+    yhats[[r]] <- yhat
+
+    # store error
+    errors[r] <- mean(yhat != test$spam)
+    
+    # print progress
+    cat(name, "[rep]:", r, "[error]:", errors[r], "\n")
+  }
+  
+  # print confusion matrix for most accurate model
+  index <- which.min(errors)
+  print(confusionMatrix(table(yhats[[index]], tests[[index]]$spam)))
+  
+  return(list("errors" = errors, "models" = models))
+}
+```
+
+### Regular Trees
+```{r}
+build_regular_tree <- function(training_data) {
+  rpart(spam ~ ., data = training_data)
+}
+
+regular_tree_errors <- train_wrapper("Regular Trees", build_regular_tree)
+```
+
+### Bagged Trees
+Use all variables at each split (mtry = p where p = number of predictors).
+```{r}
+build_bagged_tree <- function(training_data) {
+  model <- randomForest(spam ~ .,
+                        data = training_data,
+                        mtry = ncol(training_data) - 1,
+                        ntree = NTREE)
+  return(model)
+}
+
+bagged_tree_errors <- train_wrapper("Bagged Trees", build_bagged_tree)
+```
+
+### Random Forest
+Use random subset of variables at each split (mtry = square root of p).
+```{r}
+build_rf <- function(training_data) {
+  model <- randomForest(spam ~ .,
+                        data = training_data,
+                        mtry = sqrt(ncol(training_data) - 1),
+                        ntree = NTREE)
+  return(model)
+}
+
+rf_errors <- train_wrapper("Random Forest", build_rf)
+```
+
+### Weighted Random Forest
+Note: the selected weights were chosen through trial and error, thus may be overfitted to this particular random seed.
+```{r}
+build_weighted_rf <- function(training_data) {
+  model <- randomForest(spam ~ .,
+                        data = training_data,
+                        ntree = NTREE,
+                        classwt = c(.8, .9))
+  return(model)
+}
+
+weighted_rf_errors <- train_wrapper("Weighted Random Forest", build_weighted_rf)
+```
+
+\newpage
+### Balanced Random Forest
+Use under/down sampling based on size of minority class.
+```{r}
+build_balanced_rf <- function(training_data) {
+  minority_class_size <- min(table(training_data$spam))
+  
+  model <- randomForest(spam ~ .,
+                        data = training_data,
+                        ntree = NTREE,
+                        sampsize = minority_class_size)
+  return(model)
+}
+
+balanced_rf_errors <- train_wrapper("Balanced Random Forest", build_balanced_rf)
+```
+
+LDA?
+```{r}
+build_lda <- function(training_data) {
+  model <- lda(spam ~ ., data = training_data)
+  return(model)
+}
+
+lda_errors <- train_wrapper("LDA",
+                            build_lda,
+                            split_ratio = RATIO,
+                            predict_call = 3)$errors
+```
+
+### 1b) C-SVM
+```{r}
+build_csvm <- function(training_data) {
+  model <- svm(spam ~ ., data = training_data, type = "C-classification")
+  return(model)
+}
+
+csvm_errors <- train_wrapper("C-SVM",
+                             build_csvm,
+                             split_ratio = RATIO)$errors
+```
+
+### 1b) nu-SVM
+```{r}
+build_nusvm <- function(training_data) {
+  model <- svm(spam ~ ., data = training_data, type = "nu-classification")
+  return(model)
+}
+
+nusvm_errors <- train_wrapper("nu-SVM",
+                              build_nusvm,
+                              split_ratio = RATIO)$errors
+```
+
+## Results
+Combine error results into comparative boxplot.
+###### Note for Gerard - I added $errors to the end of all error lists to extract error values
+```{r}
+# aggregate to data frame
+combined_errors <- as.tibble(data.frame(
+  Regular = regular_tree_errors$errors,
+  Bagged = bagged_tree_errors$errors,
+  RF = rf_errors$errors,
+  Weighted_RF = weighted_rf_errors$errors,
+  Balanced_RF = balanced_rf_errors$errors,
+  LDA = lda_errors,
+  CSVM = csvm_errors,
+  NUSVM = nusvm_errors))
+
+# plot errors
+combined_errors %>%
+  melt(measure.vars = c("Regular", "Bagged", "RF", "Weighted_RF", "Balanced_RF", "LDA", "CSVM",
+                        "NUSVM")) %>%
+  ggplot(aes(x = variable, y = value)) + geom_boxplot() + ggtitle("Classification Errors") +
+  xlab("Classifier") + ylab("Error %")
+
+```
+
+As we can see from the above boxplots, we have Weighted Random Forest as our best performing model, with a very small advantage over a regular Random Forest.  I believe there may be some room for optimization in our models, so we will attempt optimization for both the Weighted and regular Random Forest.  We will also attempt optimization for the C-SVM model just so we can see if optimization impacts support vector machine model accuracy significantly.
+
+
+##################################################################
+#
+#
+# OPTIMIZED MODELING SECTION
+#
+#
+##################################################################
+
+
+
+Try to optimize the RandomForest model using tuneLength from the caret package
+```{r}
+# set control
+control <- trainControl(method = 'cv', number = 5)
+# retrain the model
+RF_tune_model <- train(spam ~ ., data = spamdata, method = 'rf', trControl = control,
+                       tuneLength = 5)
+# summarize the model 
+print(RF_tune_model)
+```
+
+```{r}
+# calculate accuracy of the 'regular' random forest run earlier
+mean(rf_errors$errors)
+1 - mean(rf_errors$errors)
+```
+
+As FYI, the tuning model about 10 minutes to run.  Our regular Random Forest ran with mtry = sqrt(ncol(training_data -1)) = sqrt(57) = 7.55, and that resulted in an accuracy of approximately 0.9494.  With our parameter tuning, we see that mtry = 15 is the best choice with a resulting accuracy of 0.9528.
+
+
+Try to optimize the Weighted RandomForest model using tuneLength from the caret package, using the method 'wsrf' for Weighted Subspace Random Forest
+```{r}
+# set control
+control <- trainControl(method = 'cv', number = 5)
+# retrain the model
+Weight_RF_tune_model <- train(spam ~ ., data = spamdata, method = 'wsrf', trControl = control,
+                       tuneLength = 5)
+# summarize the model 
+print(Weight_RF_tune_model)
+```
+
+As FYI, the weighted RF tuning model took about 40 minutes to run.  Our results do worse than the orignal weighted random forest, which tells me that maybe the better way to tune a weighted random forest is to experiment with the weights?
+
+```{r}
+# calculate accuracy of the 'regular' weighted random forest run earlier
+mean(weighted_rf_errors$errors)
+1 - mean(weighted_rf_errors$errors)
+```
+
+
+Try to optimize the C-SVM model "by hand"
+
+```{r}
+######### SVM tuning
+
+#Cross Validating your C - value        
+# Number of C to observe   
+n.c = 20 
+
+#  Create a sequence to try out 20 values between 2^-7 and 2^7 
+v.c = seq(2^(-7),2^7, length=n.c)
+cv.for.c = numeric(n.c)
+
+for(j in 1:n.c)
+{
+  # loop through each value of C to try
+  c.svm.xy = ksvm(spam~., data=spamdata, cross=5, C=v.c[j], 
+                  type='C-svc') 
+  
+  # get the cross validation error for each C value 
+  cv.for.c[j] = cross(c.svm.xy)
+}    
+
+# find the optimal C value
+c.opt = v.c[min(which(cv.for.c==min(cv.for.c)))]
+
+# plot the CV error for the C values
+# the optimal value is in red with a line to show it's the lowest value
+plot(x=v.c, y=cv.for.c, xlab='C Values', ylab='CV Error', 
+     main='SVM Optimization',type='b')
+points(x=c.opt,y=min(cv.for.c),col='red',pch=8)
+abline(h=min(cv.for.c),col='red')
+```
+Let's say 27 is our optimum value of C based on the plot above
+
+```{r}
+# Use optimal value of C below to re-run SVM
+csvm_spam =   ksvm(spam~., data=spamdata, cross=5, C= 27,
+                     type='C-svc')
+
+y_hat_csvm = predict(csvm_spam, spamdata[,-1])
+
+mean(y_hat_csvm!=spamdata[,1])
+
+```
+
+Using an optimized c-svm we get an error rate of 1.69% for an accuracy of 98.31%, which well surpasses our non-optimized c-svm accuracy of 93.91%.  This makes an optimized c-svm with C = 27 as our best performing model.
+
+
+##### QDA - I don't think QDA can work for this data.  We have a rank deficiency issue.  Rank deficiency in this context says there is insufficient information contained in your data to estimate the model you desire.
+```{r}
+build_qda <- function(training_data) {
+  model <- qda(spam ~ ., data = training_data)
+  return(model)
+}
+
+qda_errors <- train_wrapper("QDA",
+                            build_qda,
+                            split_ratio = RATIO,
+                            predict_call = 3)$errors
+
+#qda_errors <- qda_object$errors
+```
+
+
