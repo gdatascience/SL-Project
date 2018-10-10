@@ -23,9 +23,16 @@ The project will consist of the following tasks:
 ??? Completing a slide deck in Google Slides for the group presentation.
 ??? Effectively communicating methodology and results during the group presentation.
 
+This write-up will consist of the following sections:
+1.  Exploratory Data Analysis (EDA)
+2.  Preprocessing
+3.  Initial Models
+4.  Model Optimization
+5.  Figures & Conclusion
+
 \pagebreak
 
-#Read In spambase.data file
+##Read In spambase.data file
 
 ```{r message=FALSE}
 #Start Fresh
@@ -59,6 +66,15 @@ library(wsrf)
 library(kernlab)
 ```
 
+##################################################################
+#
+#
+# EXPLORATORY DATA ANALYSIS (EDA) SECTION
+#
+#
+##################################################################
+
+##LOAD THE DATA
 ```{r}
 # set working directory and import data
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))
@@ -66,11 +82,13 @@ spamdata <- read.csv("spambase.data", header=FALSE)
 dim(spamdata)
 ```
 
+The "spambase" data set consists of 4601 observations with 58 variables.  Let's take a closer look at the data.
+
 ```{r}
 glimpse(spamdata)
 ```
 
-
+Let's see if we have any missing data.
 ```{r}
 # Find NA per Column
 if (sum(is.na(spamdata)) == 0) {
@@ -84,7 +102,9 @@ if (sum(is.na(spamdata)) == 0) {
 }
 ```
 
-We have to add names for our variables.
+It is nice that we do not have to deal with missing data.  
+
+Next, we have to add names for our variables, correct a few variable data types, and move the response variable, "spam" to the first column.
 ```{r}
 #create a list of variable names
 newnames <- c("freq_make", "freq_address", "freq_all", "freq_3d", "freq_our", "freq_over", "freq_remove", "freq_internet", 
@@ -106,20 +126,24 @@ spamdata <- spamdata %>% dplyr::select(spam,everything())
 spamdata$spam <- as.factor(ifelse(spamdata$spam==1,"Y","N"))
 ```
 
+Let's make sure our variables look better now.
 ```{r}
 glimpse(spamdata)
 ```
 
+Let's get a clean, condensed look at the variable names.
 ```{r}
 names(spamdata)
 ```
 
-Let's look at a table of values for the response variable
+Now, we can look at a table of values for the response variable.
 ```{r}
 table(spamdata$spam)
 ```
 
-Let's look for outliers
+We have 1813 observations that are classified as "spam" and 2788 observations that are classified as not "spam".
+
+Next, let's check the data for outliers.
 ```{r}
 #manually look for outliers 
 # standard deviation methods 
@@ -137,28 +161,14 @@ for (i in 2:ncol(spamdata)){
 #sapply(dat_num, function(d) which(d > (mean(d) + 2*sd(d))))
 ```
 
-Let's rescale the data
-```{r}
-#Rescale the numeric data
+There are some outliers in all of the variable, but nothing seems too alarming.
 
-spamdata2 <- spamdata
-rescale_x <- function(x){(x-min(x))/(max(x)-min(x))}
-
-for (i in 2:ncol(spamdata)){
-spamdata2[[i]] <- rescale_x(spamdata[[i]])
-}
-```
-
-```{r}
-summary(spamdata2)
-```
-
-
-#Create histograms for the predictor variables
+##HISTOGRAMS
+Let's create histograms for the unscaled predictor variables
 ```{r}
 # Create Histograms
 for (i in 2:ncol(spamdata)){
-  assign(paste0("h", i), ggplot(data= spamdata, aes_string(colnames(spamdata)[i], fill=spamdata$spam)) + geom_histogram() + #ggtitle(names(spamdata2[i])) +
+  assign(paste0("h", i), ggplot(data= spamdata, aes_string(colnames(spamdata)[i], fill=spamdata$spam)) + geom_histogram() + #ggtitle(names(spamdata[i])) +
   theme_bw()+ theme(plot.title = element_text(hjust = 0.5)))
 }
 ```
@@ -175,7 +185,10 @@ grid.arrange(h2, h3, h4, h5, h6, h7, h8, h9, h10, h11,
                           gp=gpar(fontsize=20,font=3)))
 ```
 
-#Create box plots for the predictor variables
+Based on these histograms, it seems clear that some variables are more important than others.
+
+##BOX PLOTS
+Create box plots for the predictor variables.
 ```{r}
 # Create Boxplots
 for (i in 2:ncol(spamdata)){
@@ -203,11 +216,43 @@ grid.arrange(p2, p3, p4, p5, p6, p7, p8, p9, p10, p11,
                           gp=gpar(fontsize=20,font=3)))
 ```
 
+##################################################################
+#
+#
+# PREPROCESSING SECTION
+#
+#
+##################################################################
+
+Let's rescale the data so that all of the values are between 0 and 1.
+```{r}
+#Rescale the numeric data
+spamdata2 <- spamdata
+rescale_x <- function(x){(x-min(x))/(max(x)-min(x))}
+
+for (i in 2:ncol(spamdata)){
+spamdata2[[i]] <- rescale_x(spamdata[[i]])
+}
+```
+
+We will do a summary of the scaled data to make sure the scaling function worked as expected.
+```{r}
+summary(spamdata2)
+```
+
+The scaling function worked.  We have decided not use scaled data for our models below.  If we change our approach, we just have to uncomment the code below:
+```{r}
+######################################################
+#UNCOMMENT THIS CODE TO USED SCALED DATA IN OUR MODELS 
+######################################################
+#spamdata <- spamdata2
+```
+
 
 ##################################################################
 #
 #
-# MODELING SECTION
+# INITIAL MODELS SECTION
 #
 #
 ##################################################################
@@ -442,13 +487,12 @@ As we can see from the above boxplots, we have Weighted Random Forest as our bes
 ##################################################################
 #
 #
-# OPTIMIZED MODELING SECTION
+# MODEL OPTIMIZATION SECTION
 #
 #
 ##################################################################
 
-
-
+##RANDOMFOREST OPMTIMIZATION
 Try to optimize the RandomForest model using tuneLength from the caret package
 ```{r}
 # set control
@@ -468,7 +512,7 @@ mean(rf_errors$errors)
 
 As FYI, the tuning model took about 10 minutes to run.  Our regular Random Forest ran with mtry = sqrt(ncol(training_data -1)) = sqrt(57) = 7.55, and that resulted in an accuracy of approximately 0.9494.  With our parameter tuning, we see that mtry = 15 is the best choice with a resulting accuracy of 0.9528.
 
-
+##WEIGHTED RANDOMFOREST OPMTIMIZATION
 Try to optimize the Weighted RandomForest model using tuneLength from the caret package, using the method 'wsrf' for Weighted Subspace Random Forest
 ```{r}
 # set control
@@ -488,7 +532,7 @@ mean(weighted_rf_errors$errors)
 1 - mean(weighted_rf_errors$errors)
 ```
 
-
+##C-SVM OPMTIMIZATION
 Try to optimize the C-SVM model "by hand"
 
 ```{r}
@@ -538,7 +582,7 @@ mean(y_hat_csvm!=spamdata[,1])
 Using an optimized c-svm we get an error rate of 1.69% for an accuracy of 98.31%, which well surpasses our non-optimized c-svm accuracy of 93.91%.  This makes an optimized c-svm with C = 27 as our best performing model.
 
 
-##### QDA
+##QDA
 I don't think QDA can work for this data.  We have a rank deficiency issue.  Rank deficiency in this context says there is insufficient information contained in your data to estimate the model you desire.
 ```{r}
 build_qda <- function(training_data) {
@@ -557,56 +601,14 @@ qda_errors <- train_wrapper("QDA",
 ##################################################################
 #
 #
-# EXPLORATORY FACTOR ANALYSIS SECTION
+# FIGURES & CONCLUSION SECTION
 #
 #
 ##################################################################
 
-## Use the nfactors function
-The "nfactors" function will help us determine how many factors to maintain
+##COMPARISON
+Plot a comparison of the base and optimized model
 ```{r}
-spamdata %>% 
-  dplyr::select(-spam) %>%
-  na.omit() %>% 
-  data.matrix() %>% # use a numeric matrix representation of the data
-  cor() %>% 
-  psych::nfactors()
+
 ```
 
-The "nfactors" function suggests between 3 and 20 factors.  Let's try parallel analysis.
-## Parallel Analysis
-```{r}
-spamdata %>%
-  dplyr::select(-spam) %>%
-  data.matrix() %>% 
-  psych::fa.parallel(.,fa = "fa", n.iter = 100)
-```
-
-Parallel analysis suggests between 3 and 17 factors.  Let's see if a correlation plot helps.
-## Create correlation plot
-```{r}
-spamdata %>%
-  dplyr::select(-spam) %>%
-  na.omit() %>%
-  data.matrix() %>%
-  cor() %>% 
-  ggcorrplot::ggcorrplot(type = "lower")
-```
-
-The plot seems to suggest a lower number of factors.  Let's run factor analysis using different numbers of factors between 3 and 20.
-### Run EFA with 3 factors and oblique rotation
-```{r}
-obliqueRotation_3f = spamdata %>% 
-  dplyr::select(-spam) %>%
-  data.matrix() %>%
-  psych::fa(., nfactors = 3, rotate = "varimax")
-
-obliqueRotation_3f$loadings
-```
-
-#### Check how the 2 factor scores correlate
-```{r}
-obliqueRotation_3f$score.cor
-```
-
-I am not sure how we can use these factors in our analysis.  We might be able to create some scores that we can use to predict spam, but we will have to talk about this further.
