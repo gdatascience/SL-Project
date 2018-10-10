@@ -84,8 +84,9 @@ if (sum(is.na(spamdata)) == 0) {
 }
 ```
 
+We have to add names for our variables.
 ```{r}
-
+#create a list of variable names
 newnames <- c("freq_make", "freq_address", "freq_all", "freq_3d", "freq_our", "freq_over", "freq_remove", "freq_internet", 
               "freq_order", "freq_mail", "freq_receive", "freq_will", "freq_people", "freq_report", "freq_addresses", "freq_free",
               "freq_business", "freq_email", "freq_you", "freq_credit", "freq_your", "freq_font", "freq_000", "freq_money", 
@@ -95,8 +96,10 @@ newnames <- c("freq_make", "freq_address", "freq_all", "freq_3d", "freq_our", "f
               "freq_semicolon", "freq_parentheses", "freq_bracket", "freq_exclamation_point", "freq_dollar_sign", "freq_pound_sign", 
               "caps_len_average", "caps_len_longest", "caps_len_total", "spam")
 
+# set the variable names
 names(spamdata) <- newnames
 
+# tidy the data
 spamdata$caps_len_longest <- as.double(spamdata$caps_len_longest)
 spamdata$caps_len_total <- as.double(spamdata$caps_len_total)
 spamdata <- spamdata %>% dplyr::select(spam,everything())
@@ -111,10 +114,12 @@ glimpse(spamdata)
 names(spamdata)
 ```
 
+Let's look at a table of values for the response variable
 ```{r}
 table(spamdata$spam)
 ```
 
+Let's look for outliers
 ```{r}
 #manually look for outliers 
 # standard deviation methods 
@@ -132,7 +137,7 @@ for (i in 2:ncol(spamdata)){
 #sapply(dat_num, function(d) which(d > (mean(d) + 2*sd(d))))
 ```
 
-
+Let's rescale the data
 ```{r}
 #Rescale the numeric data
 
@@ -410,7 +415,6 @@ nusvm_errors <- train_wrapper("nu-SVM",
 
 ## Results
 Combine error results into comparative boxplot.
-###### Note for Gerard - I added $errors to the end of all error lists to extract error values
 ```{r}
 # aggregate to data frame
 combined_errors <- as.tibble(data.frame(
@@ -462,7 +466,7 @@ mean(rf_errors$errors)
 1 - mean(rf_errors$errors)
 ```
 
-As FYI, the tuning model about 10 minutes to run.  Our regular Random Forest ran with mtry = sqrt(ncol(training_data -1)) = sqrt(57) = 7.55, and that resulted in an accuracy of approximately 0.9494.  With our parameter tuning, we see that mtry = 15 is the best choice with a resulting accuracy of 0.9528.
+As FYI, the tuning model took about 10 minutes to run.  Our regular Random Forest ran with mtry = sqrt(ncol(training_data -1)) = sqrt(57) = 7.55, and that resulted in an accuracy of approximately 0.9494.  With our parameter tuning, we see that mtry = 15 is the best choice with a resulting accuracy of 0.9528.
 
 
 Try to optimize the Weighted RandomForest model using tuneLength from the caret package, using the method 'wsrf' for Weighted Subspace Random Forest
@@ -534,7 +538,8 @@ mean(y_hat_csvm!=spamdata[,1])
 Using an optimized c-svm we get an error rate of 1.69% for an accuracy of 98.31%, which well surpasses our non-optimized c-svm accuracy of 93.91%.  This makes an optimized c-svm with C = 27 as our best performing model.
 
 
-##### QDA - I don't think QDA can work for this data.  We have a rank deficiency issue.  Rank deficiency in this context says there is insufficient information contained in your data to estimate the model you desire.
+##### QDA
+I don't think QDA can work for this data.  We have a rank deficiency issue.  Rank deficiency in this context says there is insufficient information contained in your data to estimate the model you desire.
 ```{r}
 build_qda <- function(training_data) {
   model <- qda(spam ~ ., data = training_data)
@@ -549,4 +554,59 @@ qda_errors <- train_wrapper("QDA",
 #qda_errors <- qda_object$errors
 ```
 
+##################################################################
+#
+#
+# EXPLORATORY FACTOR ANALYSIS SECTION
+#
+#
+##################################################################
 
+## Use the nfactors function
+The "nfactors" function will help us determine how many factors to maintain
+```{r}
+spamdata %>% 
+  dplyr::select(-spam) %>%
+  na.omit() %>% 
+  data.matrix() %>% # use a numeric matrix representation of the data
+  cor() %>% 
+  psych::nfactors()
+```
+
+The "nfactors" function suggests between 3 and 20 factors.  Let's try parallel analysis.
+## Parallel Analysis
+```{r}
+spamdata %>%
+  dplyr::select(-spam) %>%
+  data.matrix() %>% 
+  psych::fa.parallel(.,fa = "fa", n.iter = 100)
+```
+
+Parallel analysis suggests between 3 and 17 factors.  Let's see if a correlation plot helps.
+## Create correlation plot
+```{r}
+spamdata %>%
+  dplyr::select(-spam) %>%
+  na.omit() %>%
+  data.matrix() %>%
+  cor() %>% 
+  ggcorrplot::ggcorrplot(type = "lower")
+```
+
+The plot seems to suggest a lower number of factors.  Let's run factor analysis using different numbers of factors between 3 and 20.
+### Run EFA with 3 factors and oblique rotation
+```{r}
+obliqueRotation_3f = spamdata %>% 
+  dplyr::select(-spam) %>%
+  data.matrix() %>%
+  psych::fa(., nfactors = 3, rotate = "varimax")
+
+obliqueRotation_3f$loadings
+```
+
+#### Check how the 2 factor scores correlate
+```{r}
+obliqueRotation_3f$score.cor
+```
+
+I am not sure how we can use these factors in our analysis.  We might be able to create some scores that we can use to predict spam, but we will have to talk about this further.
