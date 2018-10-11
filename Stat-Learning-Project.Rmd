@@ -248,7 +248,6 @@ The scaling function worked.  We have decided not use scaled data for our models
 #spamdata <- spamdata2
 ```
 
-
 ##################################################################
 #
 #
@@ -259,21 +258,13 @@ The scaling function worked.  We have decided not use scaled data for our models
 
 Define our constants
 ```{r}
-# random seed
-SEED <- 0
-
-# training replications
-REPS <- 50
-
-# train-test split ratio
-RATIO <- 0.6
-
-# number of trees
-NTREE <- 100
+SEED <- 0 # random seed
+REPS <- 50 # training replications
+RATIO <- 0.6 # train-test split ratio
+NTREE <- 100 # number of trees
 ```
 
 Define function for the common training tasks.
-
 ```{r}
 ###########################################################
 # Generic wrapper function for training and prediction
@@ -355,7 +346,7 @@ train_wrapper <- function(name,
 ```
 
 ### Regular Trees
-```{r}
+```{r, eval=F}
 build_regular_tree <- function(training_data) {
   rpart(spam ~ ., data = training_data)
 }
@@ -365,7 +356,7 @@ regular_tree_errors <- train_wrapper("Regular Trees", build_regular_tree)
 
 ### Bagged Trees
 Use all variables at each split (mtry = p where p = number of predictors).
-```{r}
+```{r, eval=F}
 build_bagged_tree <- function(training_data) {
   model <- randomForest(spam ~ .,
                         data = training_data,
@@ -379,7 +370,7 @@ bagged_tree_errors <- train_wrapper("Bagged Trees", build_bagged_tree)
 
 ### Random Forest
 Use random subset of variables at each split (mtry = square root of p).
-```{r}
+```{r, eval=F}
 build_rf <- function(training_data) {
   model <- randomForest(spam ~ .,
                         data = training_data,
@@ -393,7 +384,7 @@ rf_errors <- train_wrapper("Random Forest", build_rf)
 
 ### Weighted Random Forest
 Note: the selected weights were chosen through trial and error, thus may be overfitted to this particular random seed.
-```{r}
+```{r, eval=F}
 build_weighted_rf <- function(training_data) {
   model <- randomForest(spam ~ .,
                         data = training_data,
@@ -407,7 +398,7 @@ weighted_rf_errors <- train_wrapper("Weighted Random Forest", build_weighted_rf)
 
 ### Balanced Random Forest
 Use under/down sampling based on size of minority class.
-```{r}
+```{r, eval=F}
 build_balanced_rf <- function(training_data) {
   minority_class_size <- min(table(training_data$spam))
   
@@ -421,8 +412,8 @@ build_balanced_rf <- function(training_data) {
 balanced_rf_errors <- train_wrapper("Balanced Random Forest", build_balanced_rf)
 ```
 
-# LDA
-```{r}
+### LDA
+```{r, eval=F}
 build_lda <- function(training_data) {
   model <- lda(spam ~ ., data = training_data)
   return(model)
@@ -435,7 +426,7 @@ lda_errors <- train_wrapper("LDA",
 ```
 
 ### C-SVM
-```{r}
+```{r, eval=F}
 build_csvm <- function(training_data) {
   model <- svm(spam ~ ., data = training_data, type = "C-classification")
   return(model)
@@ -447,7 +438,7 @@ csvm_errors <- train_wrapper("C-SVM",
 ```
 
 ### nu-SVM
-```{r}
+```{r, eval=F}
 build_nusvm <- function(training_data) {
   model <- svm(spam ~ ., data = training_data, type = "nu-classification")
   return(model)
@@ -458,9 +449,9 @@ nusvm_errors <- train_wrapper("nu-SVM",
                               split_ratio = RATIO)$errors
 ```
 
-## Results
+## Compare Results
 Combine error results into comparative boxplot.
-```{r}
+```{r, eval=F}
 # aggregate to data frame
 combined_errors <- as.tibble(data.frame(
   Regular = regular_tree_errors$errors,
@@ -471,15 +462,30 @@ combined_errors <- as.tibble(data.frame(
   LDA = lda_errors,
   CSVM = csvm_errors,
   NUSVM = nusvm_errors))
+```
 
+
+```{r, eval = F}
+#store combined error data as RData files
+save(combined_errors, file='combined_errors.rdata')
+```
+
+
+```{r}
+#load combined error data
+load(file='combined_errors.rdata')
+```
+
+
+```{r}
 # plot errors
 combined_errors %>%
   melt(measure.vars = c("Regular", "Bagged", "RF", "Weighted_RF", "Balanced_RF", "LDA", "CSVM",
                         "NUSVM")) %>%
   ggplot(aes(x = variable, y = value)) + geom_boxplot() + ggtitle("Classification Errors") +
   xlab("Classifier") + ylab("Error %")
-
 ```
+
 
 As we can see from the above boxplots, we have Weighted Random Forest as our best performing model, with a very small advantage over a regular Random Forest.  I believe there may be some room for optimization in our models, so we will attempt optimization for both the Weighted and regular Random Forest.  We will also attempt optimization for the C-SVM model just so we can see if optimization impacts support vector machine model accuracy significantly.
 
@@ -493,16 +499,33 @@ As we can see from the above boxplots, we have Weighted Random Forest as our bes
 ##################################################################
 
 ##RANDOMFOREST OPMTIMIZATION
-Try to optimize the RandomForest model using tuneLength from the caret package
-```{r}
+Try to optimize the RandomForest model using tuneLength from the caret package.  As FYI, this tuning model will take about 5 - 10 minutes to run.  
+```{r, eval=F}
 # set control
 control <- trainControl(method = 'cv', number = 5)
 # retrain the model
 RF_tune_model <- train(spam ~ ., data = spamdata, method = 'rf', trControl = control,
                        tuneLength = 5)
+```
+
+
+```{r, eval = F}
+#store the tuned random forest model data
+save(RF_tune_model, file='RF_tune_model.rdata')
+```
+
+
+```{r}
+#load the tuned random forest model data
+load(file='RF_tune_model.rdata')
+```
+
+
+```{r}
 # summarize the model 
 print(RF_tune_model)
 ```
+
 
 ```{r}
 # calculate accuracy of the 'regular' random forest run earlier
@@ -510,21 +533,37 @@ mean(rf_errors$errors)
 1 - mean(rf_errors$errors)
 ```
 
-As FYI, the tuning model took about 10 minutes to run.  Our regular Random Forest ran with mtry = sqrt(ncol(training_data -1)) = sqrt(57) = 7.55, and that resulted in an accuracy of approximately 0.9494.  With our parameter tuning, we see that mtry = 15 is the best choice with a resulting accuracy of 0.9528.
+Our regular Random Forest ran with mtry = sqrt(ncol(training_data -1)) = sqrt(57) = 7.55, and that resulted in an accuracy of approximately 0.9494.  With our parameter tuning, we see that mtry = 15 is the best choice with a resulting accuracy of 0.9528.
 
 ##WEIGHTED RANDOMFOREST OPMTIMIZATION
-Try to optimize the Weighted RandomForest model using tuneLength from the caret package, using the method 'wsrf' for Weighted Subspace Random Forest
-```{r}
+Try to optimize the Weighted RandomForest model using tuneLength from the caret package, using the method 'wsrf' for Weighted Subspace Random Forest.  As FYI, the weighted RF tuning model will take about 20 - 40 minutes to run.  
+```{r, eval=F}
 # set control
 control <- trainControl(method = 'cv', number = 5)
 # retrain the model
 Weight_RF_tune_model <- train(spam ~ ., data = spamdata, method = 'wsrf', trControl = control,
                        tuneLength = 5)
+```
+
+
+```{r, eval = F}
+#store the tuned random forest model data
+save(Weight_RF_tune_model, file='Weight_RF_tune_model.rdata')
+```
+
+
+```{r}
+#load the tuned random forest model data
+load(file='Weight_RF_tune_model.rdata')
+```
+
+
+```{r}
 # summarize the model 
 print(Weight_RF_tune_model)
 ```
 
-As FYI, the weighted RF tuning model took about 40 minutes to run.  Our results do worse than the orignal weighted random forest, which tells me that maybe the better way to tune a weighted random forest is to experiment with the weights?
+Our results do worse than the orignal weighted random forest, which tells me that maybe the better way to tune a weighted random forest is to experiment with the weights?
 
 ```{r}
 # calculate accuracy of the 'regular' weighted random forest run earlier
@@ -534,10 +573,7 @@ mean(weighted_rf_errors$errors)
 
 ##C-SVM OPMTIMIZATION
 Try to optimize the C-SVM model "by hand"
-
 ```{r}
-######### SVM tuning
-
 #Cross Validating your C - value        
 # Number of C to observe   
 n.c = 20 
@@ -566,8 +602,8 @@ plot(x=v.c, y=cv.for.c, xlab='C Values', ylab='CV Error',
 points(x=c.opt,y=min(cv.for.c),col='red',pch=8)
 abline(h=min(cv.for.c),col='red')
 ```
-Let's say 27 is our optimum value of C based on the plot above
 
+Let's say 27 is our optimum value of C based on the plot above
 ```{r}
 # Use optimal value of C below to re-run SVM
 csvm_spam =   ksvm(spam~., data=spamdata, cross=5, C= 27,
@@ -576,7 +612,13 @@ csvm_spam =   ksvm(spam~., data=spamdata, cross=5, C= 27,
 y_hat_csvm = predict(csvm_spam, spamdata[,-1])
 
 mean(y_hat_csvm!=spamdata[,1])
+```
 
+
+```{r}
+# calculate accuracy of the 'regular' C-SVM run earlier
+mean(csvm_errors)
+1 - mean(csvm_errors)
 ```
 
 Using an optimized c-svm we get an error rate of 1.69% for an accuracy of 98.31%, which well surpasses our non-optimized c-svm accuracy of 93.91%.  This makes an optimized c-svm with C = 27 as our best performing model.
@@ -607,8 +649,19 @@ qda_errors <- train_wrapper("QDA",
 ##################################################################
 
 ##COMPARISON
-Plot a comparison of the base and optimized model
+Plot a comparison of the base and optimized models
 ```{r}
+mod_names = c('RF', 'RF_Opt', 
+              'WRF', 'WRF_Opt', 
+              'CSVM', 'CSVM_Opt')
+mod_acrcy = c(1 - mean(rf_errors$errors), 0.9528372, 
+              1 - mean(weighted_rf_errors$errors), 0.9504452,
+              1 - mean(csvm_errors), 0.9831)
 
+mod_type = c(1,1,2,2,3,3)
+
+err_comp = data.frame(cbind(mod_names, mod_acrcy, mod_type))
+
+ggplot(err_comp, aes(x = mod_names, y = mod_acrcy, fill = mod_type)) + geom_col()
 ```
 
