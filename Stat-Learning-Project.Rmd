@@ -242,6 +242,7 @@ summary(spamdata2)
 
 The scaling function worked.  Let's replace spamdata with the scaled spamdata2
 ```{r}
+spamdata_unscaled <- spamdata
 spamdata <- spamdata2
 ```
 
@@ -419,7 +420,7 @@ build_weighted_rf <- function(training_data) {
   model <- randomForest(spam ~ .,
                         data = training_data,
                         ntree = NTREE,
-                        classwt = c(.8, .9))
+                        classwt = c(.9, .8)) # c(.8, .9))
   return(model)
 }
 
@@ -440,8 +441,9 @@ load(file='weighted_rf_errors.rdata')
 ### Balanced Random Forest
 Use under/down sampling based on size of minority class.
 ```{r, eval=F}
+# minority class is 'Y'
 build_balanced_rf <- function(training_data) {
-  minority_class_size <- min(table(training_data$spam))
+  minority_class_size <- sum(spamdata$spam=='Y') # min(table(training_data$spam))
   
   model <- randomForest(spam ~ .,
                         data = training_data,
