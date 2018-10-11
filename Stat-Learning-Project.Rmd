@@ -240,12 +240,9 @@ We will do a summary of the scaled data to make sure the scaling function worked
 summary(spamdata2)
 ```
 
-The scaling function worked.  We have decided not use scaled data for our models below.  If we change our approach, we just have to uncomment the code below:
+The scaling function worked.  Let's replace spamdata with the scaled spamdata2
 ```{r}
-######################################################
-#UNCOMMENT THIS CODE TO USED SCALED DATA IN OUR MODELS 
-######################################################
-#spamdata <- spamdata2
+spamdata <- spamdata2
 ```
 
 ##################################################################
@@ -354,6 +351,17 @@ build_regular_tree <- function(training_data) {
 regular_tree_errors <- train_wrapper("Regular Trees", build_regular_tree)
 ```
 
+```{r, eval = F}
+#store regular tree error data as RData files
+save(regular_tree_errors, file='regular_tree_errors.rdata')
+```
+
+
+```{r}
+#load regular tree error data
+load(file='regular_tree_errors.rdata')
+```
+
 ### Bagged Trees
 Use all variables at each split (mtry = p where p = number of predictors).
 ```{r, eval=F}
@@ -366,6 +374,17 @@ build_bagged_tree <- function(training_data) {
 }
 
 bagged_tree_errors <- train_wrapper("Bagged Trees", build_bagged_tree)
+```
+
+```{r, eval = F}
+#store bagged tree error data as RData files
+save(bagged_tree_errors, file='bagged_tree_errors.rdata')
+```
+
+
+```{r}
+#load bagged tree error data
+load(file='bagged_tree_errors.rdata')
 ```
 
 ### Random Forest
@@ -382,6 +401,17 @@ build_rf <- function(training_data) {
 rf_errors <- train_wrapper("Random Forest", build_rf)
 ```
 
+```{r, eval = F}
+#store random forest error data as RData files
+save(rf_errors, file='rf_errors.rdata')
+```
+
+
+```{r}
+#load random forest error data
+load(file='rf_errors.rdata')
+```
+
 ### Weighted Random Forest
 Note: the selected weights were chosen through trial and error, thus may be overfitted to this particular random seed.
 ```{r, eval=F}
@@ -394,6 +424,17 @@ build_weighted_rf <- function(training_data) {
 }
 
 weighted_rf_errors <- train_wrapper("Weighted Random Forest", build_weighted_rf)
+```
+
+```{r, eval = F}
+#store weighted random forest error data as RData files
+save(weighted_rf_errors, file='weighted_rf_errors.rdata')
+```
+
+
+```{r}
+#load weighted random forest error data
+load(file='weighted_rf_errors.rdata')
 ```
 
 ### Balanced Random Forest
@@ -412,6 +453,17 @@ build_balanced_rf <- function(training_data) {
 balanced_rf_errors <- train_wrapper("Balanced Random Forest", build_balanced_rf)
 ```
 
+```{r, eval = F}
+#store balanced random forest error data as RData files
+save(balanced_rf_errors, file='balanced_rf_errors.rdata')
+```
+
+
+```{r}
+#load balanced random forest error data
+load(file='balanced_rf_errors.rdata')
+```
+
 ### LDA
 ```{r, eval=F}
 build_lda <- function(training_data) {
@@ -423,6 +475,17 @@ lda_errors <- train_wrapper("LDA",
                             build_lda,
                             split_ratio = RATIO,
                             predict_call = 3)$errors
+```
+
+```{r, eval = F}
+#store LDA error data as RData files
+save(lda_errors, file='lda_errors.rdata')
+```
+
+
+```{r}
+#load LDA error data
+load(file='lda_errors.rdata')
 ```
 
 ### C-SVM
@@ -437,6 +500,17 @@ csvm_errors <- train_wrapper("C-SVM",
                              split_ratio = RATIO)$errors
 ```
 
+```{r, eval = F}
+#store C-SVM error data as RData files
+save(csvm_errors, file='csvm_errors.rdata')
+```
+
+
+```{r}
+#load C-SVM error data
+load(file='csvm_errors.rdata')
+```
+
 ### nu-SVM
 ```{r, eval=F}
 build_nusvm <- function(training_data) {
@@ -447,6 +521,17 @@ build_nusvm <- function(training_data) {
 nusvm_errors <- train_wrapper("nu-SVM",
                               build_nusvm,
                               split_ratio = RATIO)$errors
+```
+
+```{r, eval = F}
+#store C-SVM error data as RData files
+save(nusvm_errors, file='nusvm_errors.rdata')
+```
+
+
+```{r}
+#load C-SVM error data
+load(file='nusvm_errors.rdata')
 ```
 
 ## Compare Results
@@ -463,19 +548,6 @@ combined_errors <- as.tibble(data.frame(
   CSVM = csvm_errors,
   NUSVM = nusvm_errors))
 ```
-
-
-```{r, eval = F}
-#store combined error data as RData files
-save(combined_errors, file='combined_errors.rdata')
-```
-
-
-```{r}
-#load combined error data
-load(file='combined_errors.rdata')
-```
-
 
 ```{r}
 # plot errors
