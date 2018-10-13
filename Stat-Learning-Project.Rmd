@@ -714,6 +714,42 @@ qda_errors <- train_wrapper("QDA",
 #qda_errors <- qda_object$errors
 ```
 
+##TUNED WEIGHTED RANDOM FOREST
+```{r}
+#  Create a sequence to try some values
+v.w1 = c(0.01, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1)
+v.w2 = c(0.01, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1)
+cv.for.w = matrix(0, ncol=length(v.w1), nrow=length(v.w2)) # numeric(length(v.w1)*length(v.w2))
+colnames(cv.for.w) = v.w1
+rownames(cv.for.w) = v.w2
+
+for(j in 1:length(v.w1))
+  {
+  for(i in 1:length(v.w2))
+    {
+    id = holdout(spamdata$spam, ratio=.6, mode='stratified')
+    sd.tr = spamdata[id$tr,]
+    sd.te = spamdata[id$ts,]
+    
+    # loop through each value of w to try
+    w.wrf.xy = randomForest(spam~., data=sd.tr, ntree = 50, classwt=c(v.w1[j],v.w2[i])) 
+  
+    # get the cross validation error for each w value 
+    yhat_twrf = predict(w.wrf.xy, sd.te[,-1])
+    cv.for.w[j,i] = mean(yhat_twrf!=sd.te[,1])
+    }
+  }    
+
+# find the optimal weight values
+twrf.opt.err = min(cv.for.w)
+min.err = which(cv.for.w == opt.err, arr.ind = TRUE)
+w1.opt = v.w1[min.err[1]]
+w2.opt = v.w2[min.err[2]]
+
+1-twrf.opt.err
+```
+
+
 ##################################################################
 #
 #
@@ -728,9 +764,9 @@ Plot a comparison of the base and optimized models
 mod_names = c('RF', 'RF_Opt', 
               'WRF', 'WRF_Opt', 
               'CSVM', 'CSVM_Opt')
-mod_acrcy = c(1 - mean(rf_errors$errors), 0.9528372, 
-              1 - mean(weighted_rf_errors$errors), 0.9504452,
-              1 - mean(csvm_errors), 0.9831)
+mod_acrcy = c(1 - mean(rf_errors$errors), 1 - mean(RF_tune_model$finalModel$err.rate), 
+              1 - mean(weighted_rf_errors$errors), 1-twrf.opt.err,
+              1 - mean(csvm_errors), 1 - mean(y_hat_csvm!=spamdata[,1]))
 
 mod_type = c(1,1,2,2,3,3)
 
