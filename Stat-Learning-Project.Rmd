@@ -83,7 +83,6 @@ dim(spamdata)
 ```
 
 The "spambase" data set consists of 4601 observations with 58 variables.  Let's take a closer look at the data.
-
 ```{r}
 glimpse(spamdata)
 ```
@@ -357,12 +356,6 @@ regular_tree_errors <- train_wrapper("Regular Trees", build_regular_tree)
 save(regular_tree_errors, file='regular_tree_errors.rdata')
 ```
 
-
-```{r}
-#load regular tree error data
-load(file='regular_tree_errors.rdata')
-```
-
 ### Bagged Trees
 Use all variables at each split (mtry = p where p = number of predictors).
 ```{r, eval=F}
@@ -380,12 +373,6 @@ bagged_tree_errors <- train_wrapper("Bagged Trees", build_bagged_tree)
 ```{r, eval = F}
 #store bagged tree error data as RData files
 save(bagged_tree_errors, file='bagged_tree_errors.rdata')
-```
-
-
-```{r}
-#load bagged tree error data
-load(file='bagged_tree_errors.rdata')
 ```
 
 ### Random Forest
@@ -407,12 +394,6 @@ rf_errors <- train_wrapper("Random Forest", build_rf)
 save(rf_errors, file='rf_errors.rdata')
 ```
 
-
-```{r}
-#load random forest error data
-load(file='rf_errors.rdata')
-```
-
 ### Weighted Random Forest
 Note: the selected weights were chosen through trial and error, thus may be overfitted to this particular random seed.
 ```{r, eval=F}
@@ -420,7 +401,7 @@ build_weighted_rf <- function(training_data) {
   model <- randomForest(spam ~ .,
                         data = training_data,
                         ntree = NTREE,
-                        classwt = c(.9, .8)) # c(.8, .9))
+                        classwt = c(0.3, 0.8))
   return(model)
 }
 
@@ -430,12 +411,6 @@ weighted_rf_errors <- train_wrapper("Weighted Random Forest", build_weighted_rf)
 ```{r, eval = F}
 #store weighted random forest error data as RData files
 save(weighted_rf_errors, file='weighted_rf_errors.rdata')
-```
-
-
-```{r}
-#load weighted random forest error data
-load(file='weighted_rf_errors.rdata')
 ```
 
 ### Balanced Random Forest
@@ -460,12 +435,6 @@ balanced_rf_errors <- train_wrapper("Balanced Random Forest", build_balanced_rf)
 save(balanced_rf_errors, file='balanced_rf_errors.rdata')
 ```
 
-
-```{r}
-#load balanced random forest error data
-load(file='balanced_rf_errors.rdata')
-```
-
 ### LDA
 ```{r, eval=F}
 build_lda <- function(training_data) {
@@ -484,12 +453,6 @@ lda_errors <- train_wrapper("LDA",
 save(lda_errors, file='lda_errors.rdata')
 ```
 
-
-```{r}
-#load LDA error data
-load(file='lda_errors.rdata')
-```
-
 ### C-SVM
 ```{r, eval=F}
 build_csvm <- function(training_data) {
@@ -505,12 +468,6 @@ csvm_errors <- train_wrapper("C-SVM",
 ```{r, eval = F}
 #store C-SVM error data as RData files
 save(csvm_errors, file='csvm_errors.rdata')
-```
-
-
-```{r}
-#load C-SVM error data
-load(file='csvm_errors.rdata')
 ```
 
 ### nu-SVM
@@ -532,7 +489,14 @@ save(nusvm_errors, file='nusvm_errors.rdata')
 
 
 ```{r}
-#load C-SVM error data
+#load all of the error data
+load(file='regular_tree_errors.rdata')
+load(file='bagged_tree_errors.rdata')
+load(file='rf_errors.rdata')
+load(file='weighted_rf_errors.rdata')
+load(file='balanced_rf_errors.rdata')
+load(file='lda_errors.rdata')
+load(file='csvm_errors.rdata')
 load(file='nusvm_errors.rdata')
 ```
 
@@ -637,8 +601,44 @@ load(file='Weight_RF_tune_model.rdata')
 print(Weight_RF_tune_model)
 ```
 
-Our results do worse than the orignal weighted random forest, which tells me that maybe the better way to tune a weighted random forest is to experiment with the weights?
+Our results do worse than the orignal weighted random forest, which tells me that maybe the better way to tune a weighted random forest is to experiment with the weights.  Let's give that a try:
+```{r}
+#  Create a sequence to try some values
+v.w1 = c(0.01, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1)
+v.w2 = c(0.01, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1)
+cv.for.w = matrix(0, ncol=length(v.w1), nrow=length(v.w2))
+colnames(cv.for.w) = v.w1
+rownames(cv.for.w) = v.w2
 
+# set random seed to use same data splits
+set.seed(SEED)
+id = holdout(spamdata$spam, ratio=.6, mode='stratified')
+sd.tr = spamdata[id$tr,]
+sd.te = spamdata[id$ts,]
+
+for(j in 1:length(v.w1))
+  {
+  for(i in 1:length(v.w2))
+    {
+    # loop through each value of w to try
+    w.wrf.xy = randomForest(spam~., data=sd.tr, ntree = 50, classwt=c(v.w1[j],v.w2[i])) 
+  
+    # get the cross validation error for each w value 
+    yhat_twrf = predict(w.wrf.xy, sd.te[,-1])
+    cv.for.w[j,i] = mean(yhat_twrf!=sd.te[,1])
+    }
+  }    
+
+# find the optimal weight values
+twrf.opt.err = min(cv.for.w)
+min.err = which(cv.for.w == twrf.opt.err, arr.ind = TRUE)
+w1.opt = v.w1[min.err[1]]
+w2.opt = v.w2[min.err[2]]
+
+1-twrf.opt.err
+```
+
+Compare to original
 ```{r}
 # calculate accuracy of the 'regular' weighted random forest run earlier
 mean(weighted_rf_errors$errors)
@@ -685,7 +685,7 @@ csvm_spam =   ksvm(spam~., data=spamdata, cross=5, C= 27,
 
 y_hat_csvm = predict(csvm_spam, spamdata[,-1])
 
-mean(y_hat_csvm!=spamdata[,1])
+1-mean(y_hat_csvm!=spamdata[,1])
 ```
 
 
@@ -696,59 +696,6 @@ mean(csvm_errors)
 ```
 
 Using an optimized c-svm we get an error rate of 1.69% for an accuracy of 98.31%, which well surpasses our non-optimized c-svm accuracy of 93.91%.  This makes an optimized c-svm with C = 27 as our best performing model.
-
-
-##QDA
-I don't think QDA can work for this data.  We have a rank deficiency issue.  Rank deficiency in this context says there is insufficient information contained in your data to estimate the model you desire.
-```{r}
-build_qda <- function(training_data) {
-  model <- qda(spam ~ ., data = training_data)
-  return(model)
-}
-
-qda_errors <- train_wrapper("QDA",
-                            build_qda,
-                            split_ratio = RATIO,
-                            predict_call = 3)$errors
-
-#qda_errors <- qda_object$errors
-```
-
-##TUNED WEIGHTED RANDOM FOREST
-```{r}
-#  Create a sequence to try some values
-v.w1 = c(0.01, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1)
-v.w2 = c(0.01, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1)
-cv.for.w = matrix(0, ncol=length(v.w1), nrow=length(v.w2)) # numeric(length(v.w1)*length(v.w2))
-colnames(cv.for.w) = v.w1
-rownames(cv.for.w) = v.w2
-
-for(j in 1:length(v.w1))
-  {
-  for(i in 1:length(v.w2))
-    {
-    id = holdout(spamdata$spam, ratio=.6, mode='stratified')
-    sd.tr = spamdata[id$tr,]
-    sd.te = spamdata[id$ts,]
-    
-    # loop through each value of w to try
-    w.wrf.xy = randomForest(spam~., data=sd.tr, ntree = 50, classwt=c(v.w1[j],v.w2[i])) 
-  
-    # get the cross validation error for each w value 
-    yhat_twrf = predict(w.wrf.xy, sd.te[,-1])
-    cv.for.w[j,i] = mean(yhat_twrf!=sd.te[,1])
-    }
-  }    
-
-# find the optimal weight values
-twrf.opt.err = min(cv.for.w)
-min.err = which(cv.for.w == opt.err, arr.ind = TRUE)
-w1.opt = v.w1[min.err[1]]
-w2.opt = v.w2[min.err[2]]
-
-1-twrf.opt.err
-```
-
 
 ##################################################################
 #
@@ -764,7 +711,7 @@ Plot a comparison of the base and optimized models
 mod_names = c('RF', 'RF_Opt', 
               'WRF', 'WRF_Opt', 
               'CSVM', 'CSVM_Opt')
-mod_acrcy = c(1 - mean(rf_errors$errors), 1 - mean(RF_tune_model$finalModel$err.rate), 
+mod_acrcy = c(1 - mean(rf_errors$errors), 0.9502259, 
               1 - mean(weighted_rf_errors$errors), 1-twrf.opt.err,
               1 - mean(csvm_errors), 1 - mean(y_hat_csvm!=spamdata[,1]))
 
