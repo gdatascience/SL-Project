@@ -1,33 +1,30 @@
 ---
 title: 'Statistical Learning: Final Project'
-author: 
-- 'Mike Baietto, Dan Malee, Gerard Martinez, and Tony Galvan'
-- 'West'
-date: "10/3/2018"
-output: pdf_document
+author:
+- Mike Baietto, Dan Malee, Gerard Martinez, and Tony Galvan
+- West
+date: "10/29/2018"
+output:
+  html_document:
+    df_print: paged
 ---
 
 #Final Project
 ##Description
 The goal of this project is to identify and explore interesting aspects of data in a
-real-world context, provide extensive explanations about each step, and report on your
-analysis of the results. The final project will involve communicating results of your
-analysis and technical results in a group presentation that effectively translates your
-work. You will work in groups of 3-4 students for the group presentation component and
-turn in an individual write-up component.
-
-The project will consist of the following tasks:
-??? Analyzing data and selecting the model best suited to solve the problem.
-??? Implementing and optimizing algorithms discussed in this course.
-??? Using R or Python to perform computations and analyze the results.
-??? Completing a slide deck in Google Slides for the group presentation.
-??? Effectively communicating methodology and results during the group presentation.
+real-world context, provide extensive explanations about each step, and report on our
+analysis of the results.
 
 This write-up will consist of the following sections:
+
 1.  Exploratory Data Analysis (EDA)
+
 2.  Preprocessing
+
 3.  Initial Models
+
 4.  Model Optimization
+
 5.  Figures & Conclusion
 
 \pagebreak
@@ -77,7 +74,7 @@ library(kernlab)
 ##LOAD THE DATA
 ```{r}
 # set working directory and import data
-setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+#setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 spamdata <- read.csv("spambase.data", header=FALSE)
 dim(spamdata)
 ```
@@ -502,7 +499,7 @@ load(file='nusvm_errors.rdata')
 
 ## Compare Results
 Combine error results into comparative boxplot.
-```{r, eval=F}
+```{r}
 # aggregate to data frame
 combined_errors <- as.tibble(data.frame(
   Regular = regular_tree_errors$errors,
